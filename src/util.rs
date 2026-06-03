@@ -37,3 +37,10 @@ pub fn hexdump<W: Write>(fp: &mut W, data: &[u8]) {
     )
     .ok();
 }
+
+pub fn debugdump(_data: &[u8]) {
+    #[cfg(feature = "hexdump")]
+    {
+        hexdump(&mut std::io::stderr(), _data);
+    }
+}
