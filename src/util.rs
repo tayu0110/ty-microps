@@ -44,3 +44,28 @@ pub fn debugdump(_data: &[u8]) {
         hexdump(&mut std::io::stderr(), _data);
     }
 }
+
+pub(crate) mod log_macros {
+    macro_rules! wrap_log_macros {
+    ( $name:ident, $actual:ident, $d:tt ) => {
+        #[macro_export]
+        macro_rules! $name {
+            ( $d lit:literal, $d ( $d args:expr ),* ) => {
+                ::log::$actual!("{} ({}:{})", format!($d lit, $d( $d args ),*), file!(), line!())
+            };
+            ( $d lit:literal ) => {
+                ::log::$actual!("{} ({}:{})", $d lit, file!(), line!())
+            };
+        }
+    };
+    ( $name:ident, $actual:ident ) => {
+        wrap_log_macros!($name, $actual, $);
+    };
+}
+    wrap_log_macros!(debug, debug);
+    wrap_log_macros!(error, error);
+    wrap_log_macros!(info, info);
+    wrap_log_macros!(_warn, warn);
+    pub use {_warn as warn, debug, error, info};
+}
+pub use log_macros::*;

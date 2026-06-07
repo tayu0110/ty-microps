@@ -9,28 +9,10 @@ use std::{
 };
 
 use log::{debug, error, info};
-use ty_microps::net::{
-    NET_DEVICE_TYPE_DUMMY, NET_DEVICES, NetDevice, net_device_register, net_init, net_run,
-    net_shutdown,
+use ty_microps::{
+    driver::loopback::loopback_init,
+    net::{NET_DEVICES, net_init, net_run, net_shutdown},
 };
-
-fn dummy_init() -> i32 {
-    let mut dev = NetDevice::default();
-    dev.r#type = NET_DEVICE_TYPE_DUMMY;
-    dev.mtu = 128;
-    dev.hlen = 0;
-    dev.alen = 0;
-    let ret = net_device_register(dev);
-    if ret == -1 {
-        error!("net_device_register() failure");
-        return -1;
-    }
-    info!(
-        "success, dev={}",
-        NET_DEVICES.lock().unwrap()[ret as usize].name
-    );
-    ret
-}
 
 static TERMINATE: LazyLock<Arc<AtomicBool>> = LazyLock::new(|| Arc::new(AtomicBool::new(false)));
 static TEST_DATA: &[u8] = &[
@@ -49,9 +31,9 @@ fn setup() -> i32 {
         error!("net_init() failure");
         return -1;
     }
-    let dev = dummy_init();
+    let dev = loopback_init();
     if dev < 0 {
-        error!("dummy_init() failure");
+        error!("loopback_init() failure");
         return -1;
     }
     if net_run() == -1 {
@@ -64,7 +46,7 @@ fn setup() -> i32 {
 fn app_main(dev: usize) -> i32 {
     debug!("press Ctrl+C to terminate");
     while !TERMINATE.load(Relaxed) {
-        let devices = NET_DEVICES.lock().unwrap();
+        let mut devices = NET_DEVICES.lock().unwrap();
         if devices[dev].output(0x0800, TEST_DATA, None) == -1 {
             error!("net_device_output() failure");
             break;
