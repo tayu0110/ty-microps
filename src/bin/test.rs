@@ -8,10 +8,10 @@ use std::{
     time::Duration,
 };
 
-use log::{debug, error, info};
 use ty_microps::{
     driver::loopback::loopback_init,
-    net::{NET_DEVICES, net_init, net_run, net_shutdown},
+    net::{NET_DEVICES, NET_PROTOCOL_TYPE_IP, net_init, net_run, net_shutdown},
+    util::{debug, error, info},
 };
 
 static TERMINATE: LazyLock<Arc<AtomicBool>> = LazyLock::new(|| Arc::new(AtomicBool::new(false)));
@@ -24,7 +24,7 @@ static TEST_DATA: &[u8] = &[
 fn setup() -> i32 {
     if let Err(err) = signal_hook::flag::register(signal_hook::consts::SIGINT, (*TERMINATE).clone())
     {
-        error!("signal handler registration failure: {err}");
+        error!("signal handler registration failure: {}", err);
     }
     info!("setup protocol stack...");
     if net_init() == -1 {
@@ -47,7 +47,7 @@ fn app_main(dev: usize) -> i32 {
     debug!("press Ctrl+C to terminate");
     while !TERMINATE.load(Relaxed) {
         let mut devices = NET_DEVICES.lock().unwrap();
-        if devices[dev].output(0x0800, TEST_DATA, None) == -1 {
+        if devices[dev].output(NET_PROTOCOL_TYPE_IP, TEST_DATA, None) == -1 {
             error!("net_device_output() failure");
             break;
         }

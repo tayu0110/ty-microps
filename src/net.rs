@@ -4,6 +4,7 @@ use std::sync::Mutex;
 
 use crate::{
     driver::loopback::loopback_output,
+    ip::ip_init,
     platform::{platform_init, platform_run, platform_shutdown},
     util::{debug, debugdump, error, info, warn},
 };
@@ -17,6 +18,10 @@ pub const NET_DEVICE_FLAG_LOOPBACK: u16 = 0x0010;
 const NET_DEVICE_FLAG_BROADCAST: u16 = 0x0020;
 const NET_DEVICE_FLAG_P2P: u16 = 0x0040;
 const NET_DEVICE_FLAG_NEED_ARP: u16 = 0x0100;
+
+pub const NET_PROTOCOL_TYPE_IP: u16 = 0x0800;
+const NET_PROTOCOL_TYPE_ARP: u16 = 0x0806;
+const NET_PROTOCOL_TYPE_IPV6: u16 = 0x86dd;
 
 const NET_DEVICE_ADDR_LEN: usize = 16;
 
@@ -111,6 +116,10 @@ impl NetDevice {
             data.len()
         );
         debugdump(data);
+        let protocols = PROTOCOLS.lock().unwrap();
+        if let Some(proto) = protocols.iter().find(|proto| proto.r#type == r#type) {
+            (proto.handler)(self, data);
+        }
         0
     }
 
@@ -156,10 +165,36 @@ pub fn net_device_register(mut dev: NetDevice) -> i32 {
     ret as i32
 }
 
+type NetProtocolHandler = fn(dev: &mut NetDevice, data: &[u8]);
+
+pub struct NetProtocol {
+    r#type: u16,
+    handler: NetProtocolHandler,
+}
+
+pub static PROTOCOLS: Mutex<Vec<NetProtocol>> = Mutex::new(vec![]);
+
+pub fn net_protocol_register(r#type: u16, handler: NetProtocolHandler) -> i32 {
+    let mut protocols = PROTOCOLS.lock().unwrap();
+    if protocols.iter().any(|proto| proto.r#type == r#type) {
+        error!("already registered, type=0x{:04x}", r#type);
+        return -1;
+    }
+
+    let ret = protocols.len();
+    protocols.push(NetProtocol { r#type, handler });
+    info!("success, type=0x{:04x}", r#type);
+    ret as i32
+}
+
 pub fn net_init() -> i32 {
     info!("initialize...");
     if platform_init() == -1 {
         error!("platform_init() failure");
+        return -1;
+    }
+    if ip_init() == -1 {
+        error!("ip_init() failure");
         return -1;
     }
     info!("success");
