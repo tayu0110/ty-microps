@@ -45,6 +45,21 @@ pub fn debugdump(_data: &[u8]) {
     }
 }
 
+pub(crate) fn cksum16(data: &[u8], init: u32) -> u16 {
+    let mut sum = init;
+    let mut data = data.chunks_exact(2);
+    for chunk in data.by_ref() {
+        sum += u16::from_ne_bytes([chunk[0], chunk[1]]) as u32;
+    }
+    if let &[rem] = data.remainder() {
+        sum += rem as u32;
+    }
+    while sum >> 16 > 0 {
+        sum = (sum & 0xFFFF) + (sum >> 16);
+    }
+    !sum as u16
+}
+
 pub(crate) mod log_macros {
     macro_rules! wrap_log_macros {
     ( $name:ident, $actual:ident, $d:tt ) => {
